@@ -1,0 +1,66 @@
+# {{ ansible_managed }}
+
+domain-needed
+
+{% for server in dnsmasq_servers %}
+server=/{{ server.name }}/{{ server.target }}
+{% endfor %}
+
+{% for network in dnsmasq_networks %}
+# Config for {{ network.name }}
+interface   = {{ network.interface }}
+{% if network.dhcp | default(True) %}
+{% if master_dhcp | default(false) %}
+# no-dhcp-interface={{ network.interface }}
+{% else %}
+no-dhcp-interface={{ network.interface }}
+{% endif %}
+tag-if      = set:{{ network.name }},tag:{{ network.interface }}
+dhcp-range  = tag:{{ network.name }},{{ network.range }}
+dhcp-option = tag:{{ network.name }},option:netmask,   {{ network.netmask }}
+dhcp-option = tag:{{ network.name }},option:router,    {{ network.router }}
+dhcp-option = tag:{{ network.name }},option:dns-server,{{ network.dns_server }}
+dhcp-option = tag:{{ network.name }},option:domain-name,{{ network.domain }}
+dhcp-option = tag:{{ network.name }},option:domain-search,{{ network.domain }}
+{% if dnsmasq_additional_search_domain is defined | default(False) %}
+{% for searchserver in dnsmasq_additional_search_domain %}
+dhcp-option = tag:{{ network.name }},option:domain-search,{{ searchserver }}
+{% endfor %}
+{% endif %}
+dhcp-option = tag:{{ network.name }},option:ntp-server,{{ network.ntp }}
+dhcp-option = tag:{{ network.name }},vendor:MSFT,2,1i
+{% if network.netboot is defined | d(false) %}
+dhcp-boot   = tag:{{ network.name }},{{ network.netboot }}
+{% endif %}
+domain      = {{ network.domain }},{{ network.network }}
+{% else %}
+no-dhcp-interface={{ network.interface }}
+{% endif %}
+
+{% endfor %}
+
+bind-interfaces
+
+no-hosts
+addn-hosts=/etc/hosts.dnsmasq
+
+expand-hosts
+
+{% if master_dhcp | default(false) %}
+dhcp-authoritative
+{% else %}
+# dhcp-authoritative
+{% endif %}
+
+# Overwrite local addresses (they are defines in /etc/hosts.dnsmasq)
+{% if dnsmasq_local_addresses is defined | default(False) %}
+{% for host in dnsmasq_local_addresses %}
+local=/{{ host.name }}{% if host.alias is defined %}/{{ host.alias | join("/") }}{% endif %}/
+{% endfor %}
+{% endif %}
+
+{% for host in dnsmasq_dhcp_hosts %}
+# {{ host.name }}
+dhcp-host={{ host.network }},{{ host.mac }},{{ host.hostname }},{{ host.ip }},{{ host.time }}
+{% endfor %}
+

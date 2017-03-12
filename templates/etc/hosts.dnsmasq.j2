@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# Caution! This file is used by dnsmasql to overwrite hosts
+
+{% if dnsmasq_local_addresses is defined | default(False) %}
+{% for host in dnsmasq_local_addresses %}
+{% if host.address is defined %}
+{{ host.address }}	{% if host.ptr is defined %}{{ host.ptr }} {% endif %}{{ host.name }}{% if host.alias is defined %} {{ host.alias | join(" ") }}{% endif %}
+
+{% endif %}
+{% endfor %}
+{% endif %}
+
